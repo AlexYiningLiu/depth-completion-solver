@@ -6,6 +6,8 @@
 // Include files 
 ////////////////////////////////////////////////////////////////////////
 #include <iostream>
+#include <string>
+#include <cstring>
 #include <stdlib.h>
 
 #include "R2Shapes/R2Shapes.h"
@@ -18,6 +20,9 @@ using std::endl;
 ////////////////////////////////////////////////////////////////////////
 // Program arguments
 ////////////////////////////////////////////////////////////////////////
+
+static const char *input_dir = "/home/alex/Projects/TRAIL/depth-completion-solver/temporary_data/";
+static const char *output_dir = "/home/alex/Projects/TRAIL/depth-completion-solver/output_data/";
 
 static const char *input_depth_filename = NULL;
 static const char *input_duv_filename = NULL;
@@ -296,7 +301,9 @@ ReadInputs(void)
   
   // Read input depth image
   if (input_depth_filename) {
-    input_depth_image = ReadImage(input_depth_filename, png_depth_scale, 0, print_verbose);
+    std::string filename_str(input_depth_filename);
+    std::string dir_str(input_dir);
+    input_depth_image = ReadImage((dir_str + filename_str).c_str(), png_depth_scale, 0, print_verbose);
     input_depth_image->Substitute(0, R2_GRID_UNKNOWN_VALUE);
     ResampleImage(input_depth_image, xres, yres);
     if (print_debug) input_depth_image->WriteFile("id.pfm");
@@ -328,7 +335,9 @@ ReadInputs(void)
 
   // Read normal images
   if (input_normals_filename) {
-    ReadH5(input_normals_filename, input_normals_images, 3, print_verbose);
+    std::string filename_str(input_normals_filename);
+    std::string dir_str(input_dir);
+    ReadH5((dir_str + filename_str).c_str(), input_normals_images, 3, print_verbose);
     if (input_normals_images[0]->XResolution() != xres) RNAbort("Mismatching resolution in %s", input_normals_filename);
     if (input_normals_images[0]->YResolution() != yres) RNAbort("Mismatching resolution in %s", input_normals_filename);
     
@@ -338,14 +347,6 @@ ReadInputs(void)
     // this means that if the original ny values were mostly positive, the algorithm wouldn't work 
     // anymore because they would become negative nz values after the swap
     input_normals_images[2]->Negate();
-
-    // int iy = yres - 130 - 1;
-    // for (int ix = 0; ix < 100; ix++) {
-    //   RNScalar input_nx = input_normals_images[0]->GridValue(ix, iy);
-    //   RNScalar input_ny = input_normals_images[1]->GridValue(ix, iy);
-    //   RNScalar input_nz = input_normals_images[2]->GridValue(ix, iy);
-    //   cout << iy << " " << ix << ": " << input_nx << ", " << input_ny << ", " << input_nz << endl;
-    // }
 
     count += 3;
     if (print_debug) {
@@ -472,18 +473,6 @@ WriteImage(R2Grid *grid, const char *filename, RNScalar png_scale, RNScalar png_
 
   // Copy grid so can be processed
   R2Grid tmp = *grid;
-  // R2Grid raw = *grid;
-  // char* raw_filename = "sample_files/unscaled_output.png";
-
-  //   // Process png file
-  // if (strstr(raw_filename, ".png")) {
-  //   raw.Multiply(1000);
-  //   raw.Threshold(0, 0, R2_GRID_KEEP_VALUE);
-  //   raw.Threshold(65535, R2_GRID_KEEP_VALUE, 65535);
-  // }
-
-  // Write grid
-  // if (!raw.Write(raw_filename)) return 0;
   
   // Process png file
   if (strstr(filename, ".png")) {
@@ -493,8 +482,11 @@ WriteImage(R2Grid *grid, const char *filename, RNScalar png_scale, RNScalar png_
     tmp.Threshold(65535, R2_GRID_KEEP_VALUE, 65535);
   }
 
+  std::string filename_str(filename);
+  std::string dir_str(output_dir);
+  
   // Write grid
-  if (!tmp.Write(filename)) return 0;
+  if (!tmp.Write((dir_str + filename_str).c_str())) return 0;
 
   // Print statistics
   if (print_verbose) {
@@ -1298,7 +1290,7 @@ CreateDepthImage(void)
   equations_count = equations.NEquations();
   // Log initial ssd
   RNScalar initial_ssd = equations.SumOfSquaredResiduals(x);
-  if (print_debug) printf("A %d %d %g\n", equations.NVariables(), equations.NEquations(), initial_ssd);
+  if (print_verbose) printf("A %d %d %g\n", equations.NVariables(), equations.NEquations(), initial_ssd);
 
   // Solve for depth
   if (!equations.Minimize(x, solver, 1E-3)) {
@@ -1309,7 +1301,7 @@ CreateDepthImage(void)
   
   // Log final ssd
   RNScalar final_ssd = equations.SumOfSquaredResiduals(x);
-  if (print_debug) printf("B %d %d %g\n", equations.NVariables(), equations.NEquations(), final_ssd);
+  if (print_verbose) printf("B %d %d %g\n", equations.NVariables(), equations.NEquations(), final_ssd);
 
   // Allocate output depth image
   // output_depth_image = new R2Grid(xres, yres);
