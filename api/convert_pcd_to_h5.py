@@ -1,16 +1,21 @@
+from email.mime import base
 import h5py
 import numpy as np
-import argparse
-from PCD_io_ext import Load
+from pandas import concat
 from pclpy import pcl
 import pclpy
 import cv2
-import os
 from scipy import spatial
+
 import sys
+import os
+import argparse
+
+from PCD_io_ext import Load
 
 
-def load_normals_pcd():
+def load_normals_pcd(output_dir, original_path, concat_path):
+    print("Loading PCD files at {} and {}".format(original_path, concat_path))
     pcd_original = Load(original_path)
     height, width, _ = pcd_original.shape
 
@@ -19,12 +24,8 @@ def load_normals_pcd():
     reader.read(concat_path, pcd)
 
     normals = np.reshape(pcd.normals, pcd_original.shape)
-    coordinates = np.reshape(pcd.xyz, pcd_original.shape)
 
     # Replace nan pixels with (0, 0, 0)
-    negative_or_zero_z = 0
-    positive_z = 0
-
     normals_mask = np.ones((height, width))
 
     for x in range(width):
@@ -33,52 +34,26 @@ def load_normals_pcd():
                 normals[y,x,:] = np.zeros(normals[y,x,:].shape)
                 normals_mask[y, x] = 0
 
-    cv2.imwrite(output_dir + "normals_mask.png", normals_mask * 255)
+    base_filename = os.path.basename(original_path)
+    cv2.imwrite(output_dir + base_filename.replace('.pcd', '_normals_mask.png'), normals_mask * 255)
+    print("Normals mask file written successfully")
+    normals_depth2depth = process_normals_for_depth2depth(np.copy(normals), width, height)
 
-    # ny_channel = normals[...,1]
-    # nz_channel = normals[...,2]
-    # print(ny_channel.shape)
-    # print("Negative or zero ny elements: {} out of {}".format(np.count_nonzero(ny_channel <= 0), ny_channel.size))  
-    # print("Negative or zero nz elements: {} out of {}".format(np.count_nonzero(nz_channel <= 0), nz_channel.size))  
-
-    normals_depth2depth = process_normals_for_depth2depth(np.copy(normals))
-
-    # ny_channel = normals_depth2depth[1,...]
-    # nz_channel = normals_depth2depth[2,...]
-    # print(ny_channel.shape)
-    # print("Negative or zero ny elements: {} out of {}".format(np.count_nonzero(ny_channel <= 0), ny_channel.size))  
-    # print("Negative or zero nz elements: {} out of {}".format(np.count_nonzero(nz_channel <= 0), nz_channel.size))  
-
-    with h5py.File('/home/alex/Projects/TRAIL/cleargrasp/api/depth2depth/gaps/sample_files/computed_normals.h5', "w") as f:
+    with h5py.File(output_dir + base_filename.replace('.pcd', '_normals.h5'), "w") as f:
         dset = f.create_dataset('/result', data=normals_depth2depth)
-
+    print("H5 file written successfully")
 
 
 def show_normal_stats(normals):
     print("Shape: {}, Type: {}".format(normals.shape, normals.dtype))
     print("Normals[0] min = {}, max = {}".format(np.min(normals[0,...]), np.max(normals[0,...])))
-    print("Contains NAN:", np.isnan(normals).any())
-
-    # Check NAN percentage and whether vectors are unit
-    # normalized = np.apply_along_axis(np.linalg.norm, 2, normals)
-    # nan_array = np.isnan(normalized)
-    # print("{} NAN elements in {} total elements".format(np.count_nonzero(nan_array), normalized.size))
-    # non_nan_array = ~nan_array
-    # normalized = normalized[non_nan_array]
-    # print("All non NAN vectors are unit:", (np.isclose(normalized, 1.0)).all())
-
-    ny_channel = normals[1,...]
-    nz_channel = normals[2,...]
-    print(ny_channel.shape)
-    print("Negative or zero ny elements: {} out of {}".format(np.count_nonzero(ny_channel <= 0), ny_channel.size))  
-    print("Negative or zero nz elements: {} out of {}".format(np.count_nonzero(nz_channel <= 0), nz_channel.size))    
-    
+    print("Contains NAN:", np.isnan(normals).any())  
     print()
 
 
 def process_normals_for_depth2depth(normals, width=1280, height=1024):
     normals_depth2depth_format = normals.transpose(2, 0, 1)    # convert to 3 x H x W
-    if (normals_depth2depth_format.shape != (3, 1024, 1280)):
+    if (normals_depth2depth_format.shape != (3, height, width)):
         raise ValueError('Shape of normals should be (3, H, W). Got shape: {}'.format(normals_depth2depth_format.shape))
 
     # # Convert normals to shape (N, 3)
@@ -99,14 +74,13 @@ def process_normals_for_depth2depth(normals, width=1280, height=1024):
 
 
 if __name__ == "__main__":
-    # parser = argparse.ArgumentParser(description='Normals PCD to H5')
-    # parser.add_argument('--pcd_path', required=False, type=str, default="", help='Path to sample_files dir')
-    # args = parser.parse_args()
+    parser = argparse.ArgumentParser(description='Convert Normals PCD to H5')
+    parser.add_argument('--pcd_file_gt', required=False, type=str, default='view_71_GT.pcd', help='Name of .pcd file with extension')
+    args = parser.parse_args()
 
-    # load_normals_pcd(args.pcd_path)
-    input_dir = '/home/alex/Projects/TRAIL/datasets/SCS_Sample/'
-    output_dir = '/home/alex/Projects/TRAIL/cleargrasp/api/depth2depth/gaps/sample_files/'
-    original_path = input_dir + "zigzag_scene5_view0.pcd"
-    concat_path = input_dir + "zigzag_scene5_view0_concat.pcd"
+    input_dir = '/home/alex/Projects/TRAIL/depth-completion-solver/input_data/'
+    output_dir = '/home/alex/Projects/TRAIL/depth-completion-solver/temporary_data/'
+    original_path = input_dir + args.pcd_file_gt
+    concat_path = output_dir + args.pcd_file_gt.replace('.pcd', '_concat.pcd')
 
-    load_normals_pcd()
+    load_normals_pcd(output_dir, original_path, concat_path)
