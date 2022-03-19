@@ -1,57 +1,32 @@
-import argparse
-import os
 import cv2
-import sys
 import numpy as np
 import h5py
 import imageio
+
+import sys
+import argparse
+import os
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 import utils
 
 
-INPUT_DEPTH_FILENAME = 'converted_depth_input.png'
-OUTPUT_DEPTH_FILENAME = 'zigzag_depth_output.png'
-EXPECTED_OUTPUT_DEPTH_FILENAME = 'converted_expected_output.png'
-NORMALS_FILENAME = 'computed_normals.h5'
-OCCLUSION_WEIGHTS_FILENAME = 'occlusion-weight.png'
-
-RGB_INPUT_DEPTH_FILENAME = 'converted_depth_input-rgb.jpg'
-RGB_OUTPUT_DEPTH_FILENAME = 'zigzag_depth_output-rgb.jpg'
-RGB_EXPECTED_OUTPUT_DEPTH_FILENAME = 'converted_expected_output-rgb.jpg'
-RGB_NORMALS_FILENAME = 'computed_normals-rgb.jpg'
-RGB_OCCLUSION_WEIGHTS_FILENAME = 'occlusion-weight-rgb.jpg'
-
-# INPUT_DEPTH_FILENAME = 'input-depth.png'
-# OUTPUT_DEPTH_FILENAME = 'output-depth.png'
-# EXPECTED_OUTPUT_DEPTH_FILENAME = 'expected-output-depth.png'
-# NORMALS_FILENAME = 'normals.h5'
-# OCCLUSION_WEIGHTS_FILENAME = 'occlusion-weight.png'
-
-# RGB_INPUT_DEPTH_FILENAME = 'input-depth-rgb.jpg'
-# RGB_OUTPUT_DEPTH_FILENAME = 'output-depth-rgb.jpg'
-# RGB_EXPECTED_OUTPUT_DEPTH_FILENAME = 'expected-output-depth-rgb.jpg'
-# RGB_NORMALS_FILENAME = 'normals-rgb.jpg'
-# RGB_OCCLUSION_WEIGHTS_FILENAME = 'occlusion-weight-rgb.jpg'
-
-def scaled_depth_to_rgb_depth(sample_files_dir, input_filename, output_filename, scale):
-    path_scaled_depth_img = os.path.join(sample_files_dir, input_filename)
+def scaled_depth_to_rgb_depth(path_scaled_depth_img, output_filename, scale):
     if not os.path.isfile(path_scaled_depth_img):
         print('\nError: Source file does not exist: {}\n'.format(path_scaled_depth_img))
         exit()
 
     scaled_depth = cv2.imread(path_scaled_depth_img, cv2.IMREAD_UNCHANGED)
     metric_depth = utils.unscale_depth(scaled_depth, scale)
-    print("{} Max depth: {}, min depth: {}".format(input_filename, np.max(metric_depth), np.min(metric_depth)))
+    print("{} Max depth: {}, min depth: {}".format(os.path.basename(path_scaled_depth_img), np.max(metric_depth), np.min(metric_depth)))
 
     rgb_depth = utils.depth2rgb(metric_depth, dynamic_scaling=True, color_mode=cv2.COLORMAP_JET)
 
-    cv2.imwrite(os.path.join(sample_files_dir, output_filename), rgb_depth)
+    cv2.imwrite(output_filename, rgb_depth)
     return
 
 
-def normals_to_rgb_normals(sample_files_dir, input_filename, output_filename):
-    path_input_normals = os.path.join(sample_files_dir, input_filename)
+def normals_to_rgb_normals(path_input_normals, output_filename):
     if not os.path.isfile(path_input_normals):
         print('\nError: Source file does not exist: {}\n'.format(path_input_normals))
         exit()
@@ -65,52 +40,30 @@ def normals_to_rgb_normals(sample_files_dir, input_filename, output_filename):
     normals = normals.transpose(1, 2, 0)
 
     rgb_normals = utils.normal_to_rgb(normals, output_dtype='uint8')
-    cv2.imwrite(os.path.join(sample_files_dir, output_filename), rgb_normals)
+    cv2.imwrite(output_filename, rgb_normals)
     return
 
-
-def occlusion_to_rgb_occlusion(sample_files_dir, input_filename, output_filename):
-    path_input = os.path.join(sample_files_dir, input_filename)
-    if not os.path.isfile(path_input):
-        print('\nError: Source file does not exist: {}\n'.format(path_input))
-        exit()
-
-    occlusion_boundary_weight = cv2.imread(path_input, cv2.IMREAD_UNCHANGED)
-    SCALING_FACTOR_MUL = 1000
-    NORM_FACTOR_UINT8 = SCALING_FACTOR_MUL / 255.0
-    occlusion_boundary_weight_rgb = (occlusion_boundary_weight / NORM_FACTOR_UINT8).astype(np.uint8)
-    occlusion_boundary_weight_rgb = cv2.applyColorMap(occlusion_boundary_weight_rgb, cv2.COLORMAP_OCEAN)
-    cv2.imwrite(os.path.join(sample_files_dir, output_filename), occlusion_boundary_weight_rgb)
-    return
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description='Convert the black, 16-bit .png depth images to RGB depth images.')
-
-    parser.add_argument('-s',
-                        '--sample_files_dir',
-                        required=True,
-                        type=str,
-                        help='Path to sample_files dir',
-                        metavar='path/to/dataset')
-    parser.add_argument('--scale', type=int, default=4000, help="Depth unit scale")
+    parser = argparse.ArgumentParser(description='Convert the black, 16-bit .png depth images to RGB depth images.')
+    parser.add_argument('--png_input', type=str, required=False, default='converted_view_71_raw.png', help='Name of input to depth2depth')
+    parser.add_argument('--png_expected', type=str, required=False, default='converted_view_71_GT.png', help='Name of converted GT .png')
+    parser.add_argument('--png_output', type=str, required=False, default='view_71_output.png', help='Name of depth2depth output .png')
+    parser.add_argument('--normals_input', type=str, required=False, default='view_71_GT_normals.h5', help='Name of normals input to depth2depth')
+    parser.add_argument('--scale', type=int, default=4000, help='Depth unit scale')
     args = parser.parse_args()
 
-    if not os.path.isdir(args.sample_files_dir):
-        print('\nError: Source dir does not exist: {}\n'.format(args.sample_files_dir))
-        exit()
+    dir_path_output = '/home/alex/Projects/TRAIL/depth-completion-solver/output_data/'
+    dir_path_temp = '/home/alex/Projects/TRAIL/depth-completion-solver/temporary_data/'
 
     # Input depth
-    scaled_depth_to_rgb_depth(args.sample_files_dir, INPUT_DEPTH_FILENAME, RGB_INPUT_DEPTH_FILENAME, args.scale)
+    scaled_depth_to_rgb_depth(dir_path_temp + args.png_input, dir_path_output + args.png_input.replace('.png', '_rgb.jpg'), args.scale)
 
     # Output depth
-    scaled_depth_to_rgb_depth(args.sample_files_dir, OUTPUT_DEPTH_FILENAME, RGB_OUTPUT_DEPTH_FILENAME, args.scale)
+    scaled_depth_to_rgb_depth(dir_path_output + args.png_output, dir_path_output + args.png_output.replace('.png', '_rgb.jpg'), args.scale)
 
     # Expected output depth
-    scaled_depth_to_rgb_depth(args.sample_files_dir, EXPECTED_OUTPUT_DEPTH_FILENAME, RGB_EXPECTED_OUTPUT_DEPTH_FILENAME, args.scale)
+    scaled_depth_to_rgb_depth(dir_path_temp + args.png_expected, dir_path_output + args.png_expected.replace('.png', '_rgb.jpg'), args.scale)
 
     # Normals
-    normals_to_rgb_normals(args.sample_files_dir, NORMALS_FILENAME, RGB_NORMALS_FILENAME)
-
-    # Occlusion Boundaries
-    # occlusion_to_rgb_occlusion(args.sample_files_dir, OCCLUSION_WEIGHTS_FILENAME, RGB_OCCLUSION_WEIGHTS_FILENAME)
+    normals_to_rgb_normals(dir_path_temp + args.normals_input, dir_path_output + args.normals_input.replace('.h5', '_rgb.jpg'))
