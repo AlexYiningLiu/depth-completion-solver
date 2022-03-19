@@ -4,6 +4,8 @@
 api/depth2depth/gaps/bin/
 api/depth2normal/build/
 input_data/
+temporary_data/
+output_data/
 ### C++ ###
 # Prerequisites
 *.d
