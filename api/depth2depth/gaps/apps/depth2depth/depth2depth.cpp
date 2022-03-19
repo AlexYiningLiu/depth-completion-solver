@@ -1322,6 +1322,22 @@ CreateDepthImage(void)
       if (x_index >= n) {
         cout << "ERROR, x_index surpassed n!\n";
       }
+
+      // Check that the coordinate had a valid surface normal
+      RNScalar input_nx = input_normals_images[0]->GridValue(i, j);
+      RNScalar input_ny = input_normals_images[1]->GridValue(i, j);
+      RNScalar input_nz = input_normals_images[2]->GridValue(i, j);
+      if (input_nx == R2_GRID_UNKNOWN_VALUE || input_ny == R2_GRID_UNKNOWN_VALUE || input_nz == R2_GRID_UNKNOWN_VALUE) {
+        output_depth_image->SetGridValue(i, j, 0.0);
+        x_index++;
+        continue;
+      }
+      if (input_nx == 0 && input_ny == 0 && input_nz == 0) {
+        output_depth_image->SetGridValue(i, j, 0.0);
+        x_index++;
+        continue;
+      }
+
       // Check the value against the minimum depth threshold
       if (x[x_index] < min_depth_threshold) {
         // cout << x[x_index] << " Out of thresholds bound\n";
