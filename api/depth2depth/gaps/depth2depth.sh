@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
-INPUT_PNG="converted_GEAKS_view_104_raw.png"
-OUTPUT_PNG="GEAKS_view_104_output.png"
-INPUT_NORMALS="GEAKS_view_104_GT_normals.h5"
-PNG_EXPECTED="converted_GEAKS_view_104_GT.png"
+INPUT_PNG="converted_view_71_raw.png"
+OUTPUT_PNG="view_71_output.png"
+INPUT_NORMALS="view_71_GT_normals.h5"
+PNG_EXPECTED="converted_view_71_GT.png"
 SCALE=4000
 
 bin/x86_64/depth2depth \
